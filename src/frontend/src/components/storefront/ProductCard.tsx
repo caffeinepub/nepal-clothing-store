@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/contexts/CartContext";
-import { formatNPR } from "@/lib/utils";
+import { formatNPR } from "@/lib/helpers";
 import { Link } from "@tanstack/react-router";
 import { Heart, ShoppingCart } from "lucide-react";
 import { toast } from "sonner";

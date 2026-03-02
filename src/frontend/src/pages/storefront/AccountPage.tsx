@@ -24,7 +24,7 @@ import {
   formatNPR,
   getOrderStatusColor,
   getPaymentMethodLabel,
-} from "@/lib/utils";
+} from "@/lib/helpers";
 import { Loader2, LogIn, Package, User } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";

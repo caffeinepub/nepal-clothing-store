@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/sheet";
 import { Slider } from "@/components/ui/slider";
 import { useCategories, useProducts } from "@/hooks/useQueries";
-import { formatNPR } from "@/lib/utils";
+import { formatNPR } from "@/lib/helpers";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { ChevronDown, Search, SlidersHorizontal, X } from "lucide-react";
 import { useEffect, useState } from "react";

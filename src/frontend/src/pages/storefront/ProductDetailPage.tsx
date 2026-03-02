@@ -4,7 +4,7 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCart } from "@/contexts/CartContext";
 import { useCategories, useProductById } from "@/hooks/useQueries";
-import { formatNPR } from "@/lib/utils";
+import { formatNPR } from "@/lib/helpers";
 import { Link, useParams } from "@tanstack/react-router";
 import {
   Check,

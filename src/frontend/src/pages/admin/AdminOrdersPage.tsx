@@ -34,9 +34,9 @@ import {
   formatNPR,
   getOrderStatusColor,
   getPaymentMethodLabel,
-} from "@/lib/utils";
-import { ChevronDown, Search } from "lucide-react";
-import { useState } from "react";
+} from "@/lib/helpers";
+import { Check, ChevronDown, Search, X } from "lucide-react";
+import { type MouseEvent, useState } from "react";
 import { toast } from "sonner";
 import type { Order } from "../../backend.d";
 
@@ -55,6 +55,7 @@ export function AdminOrdersPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
 
   const filtered = orders?.filter((o) => {
     const matchesSearch =
@@ -80,6 +81,48 @@ export function AdminOrdersPage() {
       }
     } catch {
       toast.error("Failed to update status");
+    }
+  };
+
+  const handleAccept = async (orderId: bigint, e: MouseEvent) => {
+    e.stopPropagation();
+    const key = orderId.toString();
+    setProcessingIds((prev) => new Set(prev).add(key));
+    try {
+      await updateStatus.mutateAsync({
+        id: orderId,
+        status: OrderStatus.processing,
+      });
+      toast.success("Order accepted — now processing");
+    } catch {
+      toast.error("Failed to accept order");
+    } finally {
+      setProcessingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    }
+  };
+
+  const handleReject = async (orderId: bigint, e: MouseEvent) => {
+    e.stopPropagation();
+    const key = orderId.toString();
+    setProcessingIds((prev) => new Set(prev).add(key));
+    try {
+      await updateStatus.mutateAsync({
+        id: orderId,
+        status: OrderStatus.cancelled,
+      });
+      toast.success("Order rejected and cancelled");
+    } catch {
+      toast.error("Failed to reject order");
+    } finally {
+      setProcessingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
     }
   };
 
@@ -143,70 +186,105 @@ export function AdminOrdersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((order) => (
-                  <TableRow
-                    key={order.id.toString()}
-                    className="cursor-pointer hover:bg-muted/30"
-                    onClick={() => setSelectedOrder(order)}
-                  >
-                    <TableCell className="font-mono text-xs">
-                      #{order.id.toString()}
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <p className="text-sm font-medium">
-                          {order.customerInfo.name}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {order.customerInfo.phone}
-                        </p>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {order.items.length}
-                    </TableCell>
-                    <TableCell className="font-semibold text-sm">
-                      {formatNPR(order.totalAmount)}
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {getPaymentMethodLabel(order.paymentMethod)}
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {formatDate(order.createdAt)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        className={`text-xs border capitalize ${getOrderStatusColor(order.orderStatus)}`}
-                      >
-                        {order.orderStatus}
-                      </Badge>
-                    </TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <Select
-                        value={order.orderStatus}
-                        onValueChange={(v) =>
-                          void handleStatusChange(order.id, v)
-                        }
-                      >
-                        <SelectTrigger className="h-8 w-32 text-xs">
-                          <SelectValue />
-                          <ChevronDown className="w-3 h-3 opacity-50" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {STATUS_OPTIONS.slice(1).map((opt) => (
-                            <SelectItem
-                              key={opt.value}
-                              value={opt.value}
-                              className="text-xs"
+                {filtered.map((order) => {
+                  const isPending = order.orderStatus === OrderStatus.pending;
+                  const isProcessingThis = processingIds.has(
+                    order.id.toString(),
+                  );
+                  return (
+                    <TableRow
+                      key={order.id.toString()}
+                      className="cursor-pointer hover:bg-muted/30"
+                      onClick={() => setSelectedOrder(order)}
+                    >
+                      <TableCell className="font-mono text-xs">
+                        #{order.id.toString()}
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          <p className="text-sm font-medium">
+                            {order.customerInfo.name}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {order.customerInfo.phone}
+                          </p>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {order.items.length}
+                      </TableCell>
+                      <TableCell className="font-semibold text-sm">
+                        {formatNPR(order.totalAmount)}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {getPaymentMethodLabel(order.paymentMethod)}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {formatDate(order.createdAt)}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          className={`text-xs border capitalize ${getOrderStatusColor(order.orderStatus)}`}
+                        >
+                          {order.orderStatus}
+                        </Badge>
+                      </TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-1.5">
+                          {/* Accept / Reject quick actions for pending orders */}
+                          {isPending && (
+                            <>
+                              <Button
+                                size="sm"
+                                disabled={isProcessingThis}
+                                onClick={(e) => void handleAccept(order.id, e)}
+                                className="h-7 px-2.5 text-xs bg-green-600 hover:bg-green-700 text-white border-0 gap-1"
+                              >
+                                <Check className="w-3 h-3" />
+                                Accept
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                disabled={isProcessingThis}
+                                onClick={(e) => void handleReject(order.id, e)}
+                                className="h-7 px-2.5 text-xs gap-1"
+                              >
+                                <X className="w-3 h-3" />
+                                Reject
+                              </Button>
+                            </>
+                          )}
+                          {/* Status dropdown for all orders */}
+                          {!isPending && (
+                            <Select
+                              value={order.orderStatus}
+                              onValueChange={(v) =>
+                                void handleStatusChange(order.id, v)
+                              }
                             >
-                              {opt.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                              <SelectTrigger className="h-8 w-32 text-xs">
+                                <SelectValue />
+                                <ChevronDown className="w-3 h-3 opacity-50" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {STATUS_OPTIONS.slice(1).map((opt) => (
+                                  <SelectItem
+                                    key={opt.value}
+                                    value={opt.value}
+                                    className="text-xs"
+                                  >
+                                    {opt.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
@@ -325,28 +403,63 @@ export function AdminOrdersPage() {
                   </span>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">
-                    Update Status:
-                  </span>
-                  <Select
-                    value={selectedOrder.orderStatus}
-                    onValueChange={(v) =>
-                      void handleStatusChange(selectedOrder.id, v)
-                    }
-                  >
-                    <SelectTrigger className="flex-1 h-8 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {STATUS_OPTIONS.slice(1).map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {/* Quick accept/reject for pending orders in detail view */}
+                {selectedOrder.orderStatus === OrderStatus.pending && (
+                  <div className="flex gap-2">
+                    <Button
+                      className="flex-1 bg-green-600 hover:bg-green-700 text-white gap-1.5"
+                      onClick={() =>
+                        void handleStatusChange(
+                          selectedOrder.id,
+                          OrderStatus.processing,
+                        )
+                      }
+                      disabled={updateStatus.isPending}
+                    >
+                      <Check className="w-4 h-4" />
+                      Accept Order
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      className="flex-1 gap-1.5"
+                      onClick={() =>
+                        void handleStatusChange(
+                          selectedOrder.id,
+                          OrderStatus.cancelled,
+                        )
+                      }
+                      disabled={updateStatus.isPending}
+                    >
+                      <X className="w-4 h-4" />
+                      Reject Order
+                    </Button>
+                  </div>
+                )}
+
+                {selectedOrder.orderStatus !== OrderStatus.pending && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">
+                      Update Status:
+                    </span>
+                    <Select
+                      value={selectedOrder.orderStatus}
+                      onValueChange={(v) =>
+                        void handleStatusChange(selectedOrder.id, v)
+                      }
+                    >
+                      <SelectTrigger className="flex-1 h-8 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {STATUS_OPTIONS.slice(1).map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
             </>
           )}

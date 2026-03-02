@@ -43,7 +43,7 @@ import {
   useDiscountCodes,
   useUpdateDiscountCode,
 } from "@/hooks/useQueries";
-import { formatNPR } from "@/lib/utils";
+import { formatNPR } from "@/lib/helpers";
 import { Edit, Loader2, Plus, Ticket, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";

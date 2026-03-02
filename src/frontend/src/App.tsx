@@ -6,9 +6,10 @@ import {
   createRootRoute,
   createRoute,
   createRouter,
-  redirect,
 } from "@tanstack/react-router";
+import { useState } from "react";
 
+import { AdminGuard } from "@/components/layout/AdminGuard";
 import { AdminSidebar } from "@/components/layout/AdminSidebar";
 import { Footer } from "@/components/layout/Footer";
 // Layouts
@@ -26,6 +27,7 @@ import { ProductsPage } from "@/pages/storefront/ProductsPage";
 
 import { AdminBannersPage } from "@/pages/admin/AdminBannersPage";
 import { AdminCategoriesPage } from "@/pages/admin/AdminCategoriesPage";
+import { AdminCustomersPage } from "@/pages/admin/AdminCustomersPage";
 // Admin pages
 import { AdminDashboard } from "@/pages/admin/AdminDashboard";
 import { AdminDiscountsPage } from "@/pages/admin/AdminDiscountsPage";
@@ -33,6 +35,7 @@ import { AdminOrdersPage } from "@/pages/admin/AdminOrdersPage";
 import { AdminProductFormPage } from "@/pages/admin/AdminProductFormPage";
 import { AdminProductsPage } from "@/pages/admin/AdminProductsPage";
 import { AdminSettingsPage } from "@/pages/admin/AdminSettingsPage";
+import { AdminSetupPage } from "@/pages/admin/AdminSetupPage";
 
 // ========================
 // Root Route
@@ -59,21 +62,35 @@ const storefrontLayout = createRoute({
 });
 
 // ========================
-// Admin Layout
+// Admin Layout (with mobile sidebar state)
 // ========================
+function AdminLayout() {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  return (
+    <AdminGuard>
+      <div className="min-h-screen bg-background">
+        <AdminSidebar
+          open={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+          onToggle={() => setSidebarOpen((prev) => !prev)}
+        />
+        <main className="ml-0 lg:ml-64 min-h-screen">
+          {/* Mobile top bar spacer */}
+          <div className="h-14 lg:hidden" />
+          <div className="p-4 sm:p-6 lg:p-8">
+            <Outlet />
+          </div>
+        </main>
+      </div>
+    </AdminGuard>
+  );
+}
+
 const adminLayout = createRoute({
   getParentRoute: () => rootRoute,
   id: "admin",
-  component: () => (
-    <div className="min-h-screen bg-background">
-      <AdminSidebar />
-      <main className="ml-64 min-h-screen">
-        <div className="p-8">
-          <Outlet />
-        </div>
-      </main>
-    </div>
-  ),
+  component: AdminLayout,
 });
 
 // ========================
@@ -173,6 +190,12 @@ const adminOrdersRoute = createRoute({
   component: AdminOrdersPage,
 });
 
+const adminCustomersRoute = createRoute({
+  getParentRoute: () => adminLayout,
+  path: "/admin/customers",
+  component: AdminCustomersPage,
+});
+
 const adminBannersRoute = createRoute({
   getParentRoute: () => adminLayout,
   path: "/admin/banners",
@@ -189,6 +212,15 @@ const adminSettingsRoute = createRoute({
   getParentRoute: () => adminLayout,
   path: "/admin/settings",
   component: AdminSettingsPage,
+});
+
+// ========================
+// Standalone Routes (no layout guard)
+// ========================
+const adminSetupRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/admin/setup",
+  component: AdminSetupPage,
 });
 
 // ========================
@@ -212,10 +244,12 @@ const routeTree = rootRoute.addChildren([
     adminProductEditRoute,
     adminCategoriesRoute,
     adminOrdersRoute,
+    adminCustomersRoute,
     adminBannersRoute,
     adminDiscountsRoute,
     adminSettingsRoute,
   ]),
+  adminSetupRoute,
 ]);
 
 const router = createRouter({ routeTree });

@@ -32,7 +32,7 @@ export function Navbar() {
               <Mountain className="w-5 h-5 text-primary-foreground" />
             </div>
             <span className="font-heading font-bold text-xl text-foreground tracking-tight">
-              Pahile<span className="text-primary"> Fashion</span>
+              Super<span className="text-primary"> Games</span>
             </span>
           </Link>
 

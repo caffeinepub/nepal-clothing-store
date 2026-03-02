@@ -22,7 +22,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useDeleteProduct, useProducts } from "@/hooks/useQueries";
-import { formatNPR } from "@/lib/utils";
+import { formatNPR } from "@/lib/helpers";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Edit, Loader2, Package, Plus, Search, Trash2 } from "lucide-react";
 import { useState } from "react";

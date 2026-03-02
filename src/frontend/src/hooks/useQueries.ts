@@ -263,7 +263,7 @@ export function useMyOrders() {
   });
 }
 
-export function useAllOrders() {
+export function useAllOrders(options?: { refetchInterval?: number }) {
   const { actor, isFetching } = useActor();
   return useQuery<Order[]>({
     queryKey: ["allOrders"],
@@ -272,6 +272,7 @@ export function useAllOrders() {
       return actor.getAllOrders();
     },
     enabled: !!actor && !isFetching,
+    refetchInterval: options?.refetchInterval,
   });
 }
 

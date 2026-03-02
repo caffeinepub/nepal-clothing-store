@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   useAllBanners,
@@ -27,8 +28,15 @@ import {
   useDeleteBanner,
   useUpdateBanner,
 } from "@/hooks/useQueries";
-import { Edit, Image as ImageIcon, Loader2, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import {
+  Edit,
+  Image as ImageIcon,
+  Loader2,
+  Plus,
+  Trash2,
+  Upload,
+} from "lucide-react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { ExternalBlob } from "../../backend";
 import type { Banner } from "../../backend.d";
@@ -47,9 +55,13 @@ export function AdminBannersPage() {
     linkUrl: "",
     displayOrder: "1",
   });
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [pendingBlob, setPendingBlob] = useState<ExternalBlob | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const openCreate = () => {
     setEditingBanner(null);
+    setPendingBlob(null);
     setForm({
       title: "",
       imageUrl: "",
@@ -61,6 +73,7 @@ export function AdminBannersPage() {
 
   const openEdit = (banner: Banner) => {
     setEditingBanner(banner);
+    setPendingBlob(null);
     setForm({
       title: banner.title,
       imageUrl: banner.imageRef.getDirectURL(),
@@ -70,12 +83,35 @@ export function AdminBannersPage() {
     setDialogOpen(true);
   };
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files?.length) return;
+    if (fileInputRef.current) fileInputRef.current.value = "";
+
+    try {
+      setUploadProgress(0);
+      const arrayBuffer = await files[0].arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      const blob = ExternalBlob.fromBytes(bytes).withUploadProgress((pct) => {
+        setUploadProgress(pct);
+      });
+      const url = blob.getDirectURL();
+      setPendingBlob(blob);
+      setForm((f) => ({ ...f, imageUrl: url }));
+      toast.success("Image ready to upload");
+    } catch {
+      toast.error("Failed to process image");
+    } finally {
+      setUploadProgress(null);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!form.title.trim() || !form.imageUrl.trim()) {
       toast.error("Title and image URL are required");
       return;
     }
-    const imageRef = ExternalBlob.fromURL(form.imageUrl);
+    const imageRef = pendingBlob ?? ExternalBlob.fromURL(form.imageUrl);
     try {
       if (editingBanner) {
         await updateBanner.mutateAsync({
@@ -248,25 +284,64 @@ export function AdminBannersPage() {
             </div>
             <div>
               <Label className="text-sm font-medium mb-1.5 block">
-                Image URL *
+                Image *
               </Label>
-              <Input
-                placeholder="https://example.com/banner.jpg"
-                value={form.imageUrl}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, imageUrl: e.target.value }))
-                }
-              />
-              {form.imageUrl && (
-                <img
-                  src={form.imageUrl}
-                  alt="Preview"
-                  className="mt-2 w-full h-24 object-cover rounded-lg border border-border"
-                  onError={(e) => {
-                    e.currentTarget.style.display = "none";
+              <div className="space-y-2">
+                <Input
+                  placeholder="https://example.com/banner.jpg"
+                  value={form.imageUrl}
+                  onChange={(e) => {
+                    setPendingBlob(null);
+                    setForm((f) => ({ ...f, imageUrl: e.target.value }));
                   }}
                 />
-              )}
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadProgress !== null}
+                    className="gap-1.5"
+                  >
+                    {uploadProgress !== null ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Upload className="w-3.5 h-3.5" />
+                    )}
+                    {uploadProgress !== null ? "Processing..." : "Upload File"}
+                  </Button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => void handleFileUpload(e)}
+                  />
+                  <span className="text-xs text-muted-foreground">
+                    or paste URL above
+                  </span>
+                </div>
+                {uploadProgress !== null && (
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Preparing image...</span>
+                      <span>{Math.round(uploadProgress)}%</span>
+                    </div>
+                    <Progress value={uploadProgress} className="h-1.5" />
+                  </div>
+                )}
+                {form.imageUrl && uploadProgress === null && (
+                  <img
+                    src={form.imageUrl}
+                    alt="Preview"
+                    className="w-full h-24 object-cover rounded-lg border border-border"
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                    }}
+                  />
+                )}
+              </div>
             </div>
             <div>
               <Label className="text-sm font-medium mb-1.5 block">

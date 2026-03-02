@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { useCart } from "@/contexts/CartContext";
 import { useValidateDiscountCode } from "@/hooks/useQueries";
-import { calculateDiscount, formatNPR } from "@/lib/utils";
+import { calculateDiscount, formatNPR } from "@/lib/helpers";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
   ArrowRight,

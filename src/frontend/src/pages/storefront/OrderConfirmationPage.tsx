@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useOrderById } from "@/hooks/useQueries";
-import { formatDate, formatNPR, getPaymentMethodLabel } from "@/lib/utils";
+import { formatDate, formatNPR, getPaymentMethodLabel } from "@/lib/helpers";
 import { Link, useParams } from "@tanstack/react-router";
 import { ArrowRight, CheckCircle2, Home, Package } from "lucide-react";
 

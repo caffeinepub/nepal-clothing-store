@@ -8,7 +8,7 @@ import {
   useCategories,
   useProducts,
 } from "@/hooks/useQueries";
-import { formatNPR } from "@/lib/utils";
+import { formatNPR } from "@/lib/helpers";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { ArrowRight, Search, Shield, Sparkles, TrendingUp } from "lucide-react";
 import { useState } from "react";

@@ -1,4 +1,12 @@
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -16,9 +24,17 @@ import {
   useCreateOrder,
   useValidateDiscountCode,
 } from "@/hooks/useQueries";
-import { NEPAL_CITIES, calculateDiscount, formatNPR } from "@/lib/utils";
+import { NEPAL_CITIES, calculateDiscount, formatNPR } from "@/lib/helpers";
 import { useNavigate } from "@tanstack/react-router";
-import { Banknote, CreditCard, Loader2, SmartphoneNfc } from "lucide-react";
+import {
+  Banknote,
+  CreditCard,
+  Info,
+  Loader2,
+  LogIn,
+  SmartphoneNfc,
+  User,
+} from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import type { DiscountCode } from "../../backend.d";
@@ -65,6 +81,7 @@ export function CheckoutPage() {
   const [appliedDiscount, setAppliedDiscount] = useState<DiscountCode | null>(
     null,
   );
+  const [showGuestConfirm, setShowGuestConfirm] = useState(false);
 
   const discountAmount = calculateDiscount(subtotal, appliedDiscount);
   const deliveryFee = subtotal >= 2000 ? 0 : 150;
@@ -97,7 +114,7 @@ export function CheckoutPage() {
     );
   };
 
-  const handlePlaceOrder = async () => {
+  const validateForm = (): boolean => {
     if (
       !customerInfo.name ||
       !customerInfo.phone ||
@@ -105,11 +122,11 @@ export function CheckoutPage() {
       !customerInfo.city
     ) {
       toast.error("Please fill in all required fields");
-      return;
+      return false;
     }
     if (customerInfo.phone.length < 10) {
       toast.error("Please enter a valid Nepal phone number (98XXXXXXXX)");
-      return;
+      return false;
     }
     if (
       (paymentMethod === PaymentMethod.esewa ||
@@ -117,15 +134,12 @@ export function CheckoutPage() {
       !paymentSimulated
     ) {
       toast.error("Please complete the payment simulation first");
-      return;
+      return false;
     }
+    return true;
+  };
 
-    if (!identity) {
-      toast.error("Please log in to place an order");
-      login();
-      return;
-    }
-
+  const submitOrder = async () => {
     const orderItems = items.map((item) => ({
       productId: BigInt(item.productId),
       name: item.name,
@@ -148,9 +162,48 @@ export function CheckoutPage() {
         to: "/order-confirmation/$id",
         params: { id: orderId.toString() },
       });
-    } catch {
-      toast.error("Failed to place order. Please try again.");
+    } catch (err) {
+      // Backend requires user role — show friendly sign-in prompt
+      const errorMsg =
+        err instanceof Error ? err.message.toLowerCase() : String(err);
+      const isAuthError =
+        errorMsg.includes("unauthorized") ||
+        errorMsg.includes("not authorized") ||
+        errorMsg.includes("caller is not") ||
+        errorMsg.includes("anonymous") ||
+        errorMsg.includes("permission");
+
+      if (isAuthError || !identity) {
+        toast.error("Sign in required to place an order", {
+          description:
+            "Guest checkout is not available yet. Please sign in to continue.",
+          action: {
+            label: "Sign In",
+            onClick: login,
+          },
+          duration: 6000,
+        });
+      } else {
+        toast.error("Failed to place order. Please try again.");
+      }
     }
+  };
+
+  const handlePlaceOrder = async () => {
+    if (!validateForm()) return;
+
+    // If not logged in, show guest confirmation dialog
+    if (!identity) {
+      setShowGuestConfirm(true);
+      return;
+    }
+
+    await submitOrder();
+  };
+
+  const handleConfirmGuest = async () => {
+    setShowGuestConfirm(false);
+    await submitOrder();
   };
 
   if (items.length === 0) {
@@ -163,6 +216,34 @@ export function CheckoutPage() {
       <h1 className="font-heading font-bold text-2xl text-foreground mb-6">
         Checkout
       </h1>
+
+      {/* Sign-in nudge banner — non-blocking */}
+      {!identity && (
+        <div className="flex items-center gap-3 p-3 mb-6 bg-blue-50 border border-blue-200 rounded-xl">
+          <div className="w-7 h-7 bg-blue-100 rounded-lg flex items-center justify-center shrink-0">
+            <Info className="w-3.5 h-3.5 text-blue-600" />
+          </div>
+          <p className="text-sm text-blue-800 flex-1">
+            <button
+              type="button"
+              onClick={login}
+              className="font-semibold underline underline-offset-2 hover:text-blue-900 transition-colors"
+            >
+              Sign in
+            </button>{" "}
+            to track your orders — or continue as guest below.
+          </p>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={login}
+            className="shrink-0 h-7 text-xs gap-1 border-blue-300 text-blue-700 hover:bg-blue-100"
+          >
+            <LogIn className="w-3 h-3" />
+            Sign In
+          </Button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left: Form */}
@@ -455,20 +536,66 @@ export function CheckoutPage() {
 
             {!identity && (
               <p className="text-xs text-center text-muted-foreground mt-2">
-                You'll need to{" "}
                 <button
                   type="button"
                   onClick={login}
-                  className="text-primary underline underline-offset-2"
+                  className="text-primary underline underline-offset-2 font-medium"
                 >
-                  sign in
+                  Sign in
                 </button>{" "}
-                to place an order
+                to track your orders after purchase
               </p>
             )}
           </div>
         </div>
       </div>
+
+      {/* Guest Checkout Confirmation Dialog */}
+      <Dialog open={showGuestConfirm} onOpenChange={setShowGuestConfirm}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="font-heading flex items-center gap-2">
+              <User className="w-4 h-4 text-muted-foreground" />
+              Continue as Guest?
+            </DialogTitle>
+            <DialogDescription>
+              You won't be able to track this order later without signing in.
+              Your order details will be sent via phone contact only.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowGuestConfirm(false)}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowGuestConfirm(false);
+                login();
+              }}
+              className="flex-1 gap-1.5 border-primary/40 text-primary hover:bg-primary/5"
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              Sign In Instead
+            </Button>
+            <Button
+              onClick={() => void handleConfirmGuest()}
+              disabled={createOrder.isPending}
+              className="flex-1"
+            >
+              {createOrder.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                "Continue as Guest"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }

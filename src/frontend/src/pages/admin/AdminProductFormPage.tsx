@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
@@ -83,6 +84,10 @@ export function AdminProductFormPage({ mode }: { mode: "create" | "edit" }) {
   const [sizeInput, setSizeInput] = useState("");
   const [colorInput, setColorInput] = useState("");
   const [imageUrlInput, setImageUrlInput] = useState("");
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [pendingBlobs, setPendingBlobs] = useState<Map<string, ExternalBlob>>(
+    new Map(),
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -133,9 +138,33 @@ export function AdminProductFormPage({ mode }: { mode: "create" | "edit" }) {
     const files = e.target.files;
     if (!files?.length) return;
     const file = files[0];
-    const objectUrl = URL.createObjectURL(file);
-    setForm((f) => ({ ...f, imageUrls: [...f.imageUrls, objectUrl] }));
-    toast.info("Image preview added. It will be uploaded when you save.");
+
+    // Reset file input so the same file can be re-selected
+    if (fileInputRef.current) fileInputRef.current.value = "";
+
+    try {
+      setUploadProgress(0);
+      const arrayBuffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      const blob = ExternalBlob.fromBytes(bytes).withUploadProgress((pct) => {
+        setUploadProgress(pct);
+      });
+
+      const previewUrl = blob.getDirectURL();
+
+      setPendingBlobs((prev) => {
+        const next = new Map(prev);
+        next.set(previewUrl, blob);
+        return next;
+      });
+
+      setForm((f) => ({ ...f, imageUrls: [...f.imageUrls, previewUrl] }));
+      toast.success("Image ready to upload");
+    } catch {
+      toast.error("Failed to process image");
+    } finally {
+      setUploadProgress(null);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -146,8 +175,8 @@ export function AdminProductFormPage({ mode }: { mode: "create" | "edit" }) {
       return;
     }
 
-    const images: ExternalBlob[] = form.imageUrls.map((url) =>
-      ExternalBlob.fromURL(url),
+    const images: ExternalBlob[] = form.imageUrls.map(
+      (url) => pendingBlobs.get(url) ?? ExternalBlob.fromURL(url),
     );
 
     const data = {
@@ -525,9 +554,14 @@ export function AdminProductFormPage({ mode }: { mode: "create" | "edit" }) {
                 size="sm"
                 onClick={() => fileInputRef.current?.click()}
                 className="gap-1.5"
+                disabled={uploadProgress !== null}
               >
-                <Upload className="w-3.5 h-3.5" />
-                Upload Image
+                {uploadProgress !== null ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Upload className="w-3.5 h-3.5" />
+                )}
+                {uploadProgress !== null ? "Processing..." : "Upload Image"}
               </Button>
               <input
                 ref={fileInputRef}
@@ -540,6 +574,15 @@ export function AdminProductFormPage({ mode }: { mode: "create" | "edit" }) {
                 JPG, PNG supported
               </span>
             </div>
+            {uploadProgress !== null && (
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Preparing image...</span>
+                  <span>{Math.round(uploadProgress)}%</span>
+                </div>
+                <Progress value={uploadProgress} className="h-1.5" />
+              </div>
+            )}
             {form.imageUrls.length > 0 && (
               <div className="flex gap-2 flex-wrap">
                 {form.imageUrls.map((url, i) => (
